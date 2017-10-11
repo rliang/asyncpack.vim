@@ -5,6 +5,7 @@ fu! s:load_opts_recursive(paths)
   if len(a:paths)
     cal timer_start(0, {-> s:load_opts_recursive(a:paths[1:])})
     exe 'pa' a:paths[0]
+    exe 'doautoa' 'User' 'asyncpack:'.a:paths[0]
   en
 endf
 

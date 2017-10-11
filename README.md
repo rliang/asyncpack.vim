@@ -1,6 +1,10 @@
 # asyncpack.vim
 Loads opt vim8/neovim plugins in a way that minimizes UI blocking.
 
+It's not a plugin manager, instead it relies on vim8/neovim's `packpath`
+management. It might not be so useful if you already use another plugin
+manager.
+
 ## How it works
 Currently, there is no built-in way to load plugins in the background, so here
 `timer_start` is used to schedule `packadd` calls to the next tick in the event
@@ -28,8 +32,6 @@ packadd! asyncpack.vim
 ```
 to ensure it is loaded before other plugins.
 
-Instructions for other package managers may vary.
-
 ## Variables
 * `g:asyncpack#include` (List): When defined, load asynchronously only these
   plugins. Default undefined.
@@ -37,3 +39,9 @@ Instructions for other package managers may vary.
   if you want to call `packadd` yourself. Default empty list.
 * `g:asyncpack#rplugin` (Boolean): Whether to asynchronously load
   `runtime/plugin/rplugin.vim`, to further reduce startup time. Default 1.
+
+## Events
+You can bind autocmds to after a plugin has loaded, like so:
+```vim
+autocmd User asyncpack:vim-colors-solarized colorscheme solarized
+```
