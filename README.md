@@ -1,52 +1,57 @@
 # asyncpack.vim
-Loads opt vim8/neovim plugins in a way that minimizes UI blocking.
+Improves vim8/neovim startup times by deferring sourcing files.
 
-It's not a plugin manager, instead it relies on vim8/neovim's `packpath`
-management. It might not be so useful if you already use another plugin
-manager.
+## What
+Vim runtime files, plugins and `start` packages are usually loaded all at once
+during startup. So if you have many plugins, you typically have to wait some
+time until the UI is presented.
 
-## How it works
-Currently, there is no built-in way to load plugins in the background, so we
-use `timer_start` to schedule subsequent `packadd` calls. This is similar to
-using `requestAnimationFrame` in Javascript to perform asynchronous operations.
+What we want is to source vim files asynchronously, which is not possible by
+design, but we can fake it through the vim8 `timers` feature, which specifies
+that `The callback is only invoked when Vim is waiting for input`.
 
-Since `packadd` is blocking by design, it is still possible for a single plugin
-to take enough time to load as to block the next tick in the event loop.
-Nevertheless, we can drastically improve the time to the first screen update:
+What this plugin does is fire a timer and source one file per callback,
+allowing the UI to refresh in the meanwhile. Thus, improving startup time and
+responsiveness, as seen by some `--startuptime` measurements:
 
-* eager loading: `301.981`ms
-* autocmd-based lazy loading: `271.143`ms (python remote host startup takes up
-  most time)
-* asyncpack.vim: `018.948`ms
+* 23 `start` packages: `480.212  006.737: first screen update`
+* 23 `opt` packages: `374.875  008.685: first screen update`
+* 23 `opt` packages + `asyncpack#optimize=0`: `388.835  006.843: first screen update`
+* 23 `opt` packages + `asyncpack#optimize=1`: `063.102  007.178: first screen update`
+* 23 `opt` packages + `asyncpack#optimize=2`: `033.373  001.068: first screen update`
+
+Note that if some file is large enough, it can take more time to load than the
+time until the next UI refresh, causing flicker.
 
 ## Installation
-Clone the repo as an opt plugin:
+Clone the repo as an `opt` package:
 ```sh
 git clone --depth=1 https://github.com/rliang/asyncpack.vim ~/.config/nvim/pack/foo/opt/asyncpack.vim`
 ```
 
-Add to `.vimrc` or `init.vim`:
+To ensure it is loaded before anything else, add to `.vimrc` or `init.vim`:
 ```vim
 packadd asyncpack.vim
 ```
-to ensure it is loaded before anything else.
+
+For best results, all external plugins should be `opt` packages.
 
 ## Variables
-* `g:asyncpack#include` (List): When defined, load asynchronously only these
-  plugins. Default undefined.
-* `g:asyncpack#exclude` (List): Do not load asynchronously these plugins. Use
-  if you want to call `packadd` yourself. Default empty list.
-* `g:asyncpack#rplugin` (Boolean): Whether to asynchronously load
-  `runtime/plugin/rplugin.vim`, to further reduce startup time. Default 1.
-* `g:asyncpack#filetypes` (Boolean): Whether to asynchronously load
-  `runtime/filetype.vim`, to further reduce startup time. Default 1.
+* `g:asyncpack#include` (List): `opt` packages to load asynchronously.
+  Defaults to all `opt` packages in `&packpath`.
+* `g:asyncpack#exclude` (List): `opt` packages to not load asynchronously.
+  Use if you want to load some packages through e.g. autocommands.
+  Defaults to all `opt` packages in `$VIM/runtime/pack`.
+* `g:asyncpack#optimize` (Integer): 0 to only load `opt` packages asynchronously,
+  1 to also defer loading plugins and `start` packages (at once),
+  2 to also defer loading vim runtime files.
+  Default 2.
 
 ## Events
-You can bind autocmds to after a specific plugin has loaded, like so:
+
 ```vim
-autocmd User asyncpack:vim-colors-solarized colorscheme solarized
-```
-And after all plugins have loaded:
-```vim
-autocmd User asyncpack set clipboard+=unnamedplus
+autocmd User asyncpack:runtime echo "loaded runtime files"
+autocmd User asyncpack:plugins echo "loaded plugins and start packages"
+autocmd User asyncpack:opts:vim-colors-solarized colorscheme solarized
+autocmd User asyncpack:opts echo "loaded opt packages"
 ```
